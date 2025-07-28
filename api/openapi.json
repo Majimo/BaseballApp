@@ -1,0 +1,690 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Baseball Tournament API",
+    "version": "1.0.0",
+    "description": "API pour la gestion de tournois de baseball en round robin."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000",
+      "description": "Serveur de développement local"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Health",
+      "description": "Vérification de l'état de l'API"
+    },
+    {
+      "name": "Tournaments",
+      "description": "Opérations liées aux tournois de baseball"
+    },
+    {
+      "name": "Teams",
+      "description": "Opérations liées aux équipes de baseball"
+    },
+    {
+      "name": "Players",
+      "description": "Opérations liées aux joueurs de baseball"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "summary": "Vérifier l'état de l'API",
+        "tags": ["Health"],
+        "responses": {
+          "200": {
+            "description": "API is running",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "ok" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tournoi": {
+      "get": {
+        "summary": "Lister tous les tournois",
+        "tags": ["Tournaments"],
+        "responses": {
+          "200": {
+            "description": "Liste de tous les tournois enregistrés",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Tournament"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Créer un nouveau tournoi",
+        "tags": ["Tournaments"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "location", "date", "teams"],
+                "properties": {
+                  "name": { "type": "string", "example": "Tournoi de Printemps" },
+                  "location": {
+                    "type": "object",
+                    "properties": {
+                      "address": { "type": "string", "example": "123 Rue Principale" },
+                      "city": { "type": "string", "example": "Baseballville" },
+                      "zipCode": { "type": "string", "example": "12345" }
+                    },
+                    "required": ["address", "city", "zipCode"]
+                  },
+                  "date": { "type": "string", "format": "date-time", "example": "2025-08-15T10:00:00Z" },
+                  "teams": {
+                    "type": "array",
+                    "items": {
+                      "$ref": "#/components/schemas/Team"
+                    },
+                    "description": "Liste des équipes participant au tournoi. Le calendrier des matchs sera généré automatiquement."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Tournoi créé avec succès, incluant le calendrier des matchs généré.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Tournament"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Données d'entrée invalides"
+          }
+        }
+      }
+    },
+    "/tournoi/{id}": {
+      "get": {
+        "summary": "Obtenir les informations d'un tournoi spécifique",
+        "tags": ["Tournaments"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID unique du tournoi",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Détails du tournoi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Tournament"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Tournoi non trouvé"
+          }
+        }
+      },
+      "put": {
+        "summary": "Mettre à jour un tournoi existant",
+        "tags": ["Tournaments"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID unique du tournoi à mettre à jour",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Tournament"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Tournoi mis à jour avec succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Tournament"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Tournoi non trouvé"
+          },
+          "400": {
+            "description": "Données d'entrée invalides"
+          }
+        }
+      }
+    },
+    "/tournoi/{id}/match": {
+      "get": {
+        "summary": "Lister tous les matchs d'un tournoi",
+        "tags": ["Tournaments"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID unique du tournoi",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Liste des matchs du tournoi",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Match"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Tournoi non trouvé"
+          }
+        }
+      },
+      "post": {
+        "summary": "Ajouter un match manuel à un tournoi",
+        "tags": ["Tournaments"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID unique du tournoi",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["team1Id", "team2Id", "date", "time"],
+                "properties": {
+                  "team1Id": { "type": "string", "format": "uuid", "example": "uuid-equipe-a" },
+                  "team2Id": { "type": "string", "format": "uuid", "example": "uuid-equipe-b" },
+                  "date": { "type": "string", "format": "date", "example": "2025-08-16" },
+                  "time": { "type": "string", "example": "14:00" },
+                  "score": { "type": "string", "example": "5-3", "nullable": true }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Match ajouté avec succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Match"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Tournoi non trouvé"
+          },
+          "400": {
+            "description": "Données d'entrée invalides"
+          }
+        }
+      }
+    },
+    "/tournoi/{id}/match/{idMatch}": {
+      "put": {
+        "summary": "Modifier un match spécifique d'un tournoi",
+        "tags": ["Tournaments"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID unique du tournoi",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "idMatch",
+            "in": "path",
+            "required": true,
+            "description": "ID unique du match",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "team1Id": { "type": "string", "format": "uuid", "example": "uuid-equipe-a" },
+                  "team2Id": { "type": "string", "format": "uuid", "example": "uuid-equipe-b" },
+                  "date": { "type": "string", "format": "date", "example": "2025-08-16" },
+                  "time": { "type": "string", "example": "14:00" },
+                  "score": { "type": "string", "example": "5-3" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Match mis à jour avec succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Match"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Tournoi ou match non trouvé"
+          },
+          "400": {
+            "description": "Données d'entrée invalides"
+          }
+        }
+      }
+    },
+    "/equipe": {
+      "get": {
+        "summary": "Lister toutes les équipes",
+        "tags": ["Teams"],
+        "responses": {
+          "200": {
+            "description": "Liste de toutes les équipes enregistrées",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Team"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Ajouter une nouvelle équipe",
+        "tags": ["Teams"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "city"],
+                "properties": {
+                  "name": { "type": "string", "example": "Les Dragons" },
+                  "city": { "type": "string", "example": "Ville du Dragon" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Équipe créée avec succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Team"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Données d'entrée invalides"
+          }
+        }
+      }
+    },
+    "/equipe/{id}": {
+      "get": {
+        "summary": "Obtenir les détails d'une équipe et la liste de ses joueurs",
+        "tags": ["Teams"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID unique de l'équipe",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Détails de l'équipe et ses joueurs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Team"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Équipe non trouvée"
+          }
+        }
+      },
+      "put": {
+        "summary": "Mettre à jour une équipe existante",
+        "tags": ["Teams"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID unique de l'équipe à mettre à jour",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "example": "Les Dragons Renforcés" },
+                  "city": { "type": "string", "example": "Nouvelle Ville" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Équipe mise à jour avec succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Team"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Équipe non trouvée"
+          },
+          "400": {
+            "description": "Données d'entrée invalides"
+          }
+        }
+      }
+    },
+    "/joueur": {
+      "post": {
+        "summary": "Ajouter un nouveau joueur",
+        "tags": ["Players"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["firstName", "lastName", "jerseyNumber", "birthDate", "teamId"],
+                "properties": {
+                  "firstName": { "type": "string", "example": "Jean" },
+                  "lastName": { "type": "string", "example": "Dupont" },
+                  "jerseyNumber": { "type": "string", "example": "23" },
+                  "birthDate": { "type": "string", "format": "date", "example": "2000-01-01" },
+                  "teamId": { "type": "string", "format": "uuid", "example": "uuid-equipe-existante" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Joueur créé avec succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Player"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Données d'entrée invalides"
+          }
+        }
+      }
+    },
+    "/joueur/{id}": {
+      "get": {
+        "summary": "Obtenir les détails d'un joueur spécifique",
+        "tags": ["Players"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID unique du joueur",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Détails du joueur",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Player"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Joueur non trouvé"
+          }
+        }
+      },
+      "put": {
+        "summary": "Mettre à jour un joueur existant",
+        "tags": ["Players"],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID unique du joueur à mettre à jour",
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "firstName": { "type": "string", "example": "Jean-Luc" },
+                  "lastName": { "type": "string", "example": "Picard" },
+                  "jerseyNumber": { "type": "string", "example": "10" },
+                  "birthDate": { "type": "string", "format": "date", "example": "1999-05-20" },
+                  "teamId": { "type": "string", "format": "uuid", "example": "uuid-nouvelle-equipe" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Joueur mis à jour avec succès",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Player"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Joueur non trouvé"
+          },
+          "400": {
+            "description": "Données d'entrée invalides"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Player": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid", "description": "ID unique du joueur" },
+          "firstName": { "type": "string", "description": "Prénom du joueur" },
+          "lastName": { "type": "string", "description": "Nom du joueur" },
+          "jerseyNumber": { "type": "string", "description": "Numéro de maillot du joueur (identifiant unique)" },
+          "birthDate": { "type": "string", "format": "date", "description": "Date de naissance du joueur (AAAA-MM-JJ)" },
+          "teamId": { "type": "string", "format": "uuid", "description": "ID de l'équipe à laquelle le joueur appartient" }
+        },
+        "required": ["id", "firstName", "lastName", "jerseyNumber", "birthDate", "teamId"]
+      },
+      "Team": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid", "description": "ID unique de l'équipe" },
+          "name": { "type": "string", "description": "Nom de l'équipe" },
+          "city": { "type": "string", "description": "Ville de l'équipe" },
+          "players": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Player"
+            },
+            "description": "Liste des joueurs de l'équipe"
+          }
+        },
+        "required": ["id", "name", "city", "players"]
+      },
+      "Match": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid", "description": "ID unique du match" },
+          "tournamentId": { "type": "string", "format": "uuid", "description": "ID du tournoi auquel le match appartient" },
+          "team1Id": { "type": "string", "format": "uuid", "description": "ID de la première équipe" },
+          "team2Id": { "type": "string", "format": "uuid", "description": "ID de la deuxième équipe" },
+          "date": { "type": "string", "format": "date", "description": "Date du match (AAAA-MM-JJ)" },
+          "time": { "type": "string", "description": "Heure du match (HH:MM)" },
+          "score": { "type": "string", "description": "Score du match (ex: '5-3')", "nullable": true }
+        },
+        "required": ["id", "tournamentId", "team1Id", "team2Id", "date", "time"]
+      },
+      "Tournament": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string", "format": "uuid", "description": "ID unique du tournoi" },
+          "name": { "type": "string", "description": "Nom du tournoi" },
+          "location": {
+            "type": "object",
+            "properties": {
+              "address": { "type": "string", "description": "Adresse du lieu du tournoi" },
+              "city": { "type": "string", "description": "Ville du lieu du tournoi" },
+              "zipCode": { "type": "string", "description": "Code postal du lieu du tournoi" }
+            },
+            "required": ["address", "city", "zipCode"]
+          },
+          "date": { "type": "string", "format": "date-time", "description": "Date et heure du tournoi" },
+          "teams": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Team"
+            },
+            "description": "Liste des équipes participant au tournoi"
+          },
+          "matches": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Match"
+            },
+            "description": "Liste des matchs du tournoi (générés ou ajoutés manuellement)"
+          }
+        },
+        "required": ["id", "name", "location", "date", "teams", "matches"]
+      }
+    }
+  }
+}

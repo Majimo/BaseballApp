@@ -1,0 +1,31 @@
+# Fichiers générés par Deno
+deno.lock
+target/
+
+# Fichiers de cache et de dépendances
+.deno/
+.cache/
+node_modules/
+
+# Fichiers de compilation (si vous compilez votre code TypeScript en JavaScript)
+*.js
+*.jsx
+*.ts.map
+*.d.ts
+
+# Fichiers de configuration sensibles ou spécifiques à l'environnement
+.env
+.env.*
+*.pem
+*.key
+
+# Logs
+*.log
+logs/
+
+# Fichiers temporaires ou de l'OS
+.DS_Store
+Thumbs.db
+*.tmp
+*.bak
+*~
