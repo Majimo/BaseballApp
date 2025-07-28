@@ -1,31 +1,29 @@
-# Fichiers générés par Deno
-deno.lock
-target/
-
-# Fichiers de cache et de dépendances
+# Deno cache directory
 .deno/
-.cache/
+
+# SQLite database file
+*.db
+*.sqlite
+*.sqlite3
+
+# Node.js modules (if npm: imports are used, Deno might create this)
 node_modules/
 
-# Fichiers de compilation (si vous compilez votre code TypeScript en JavaScript)
-*.js
-*.jsx
-*.ts.map
-*.d.ts
-
-# Fichiers de configuration sensibles ou spécifiques à l'environnement
-.env
-.env.*
-*.pem
-*.key
-
-# Logs
+# Log files
 *.log
-logs/
 
-# Fichiers temporaires ou de l'OS
-.DS_Store
-Thumbs.db
-*.tmp
-*.bak
-*~
+# Environment variables file
+.env
+.env.local
+
+# Editor/IDE specific files
+.vscode/
+.idea/
+*.iml
+
+# Build output directories (if any)
+dist/
+build/
+
+# Deno specific files
+*.tsbuildinfo

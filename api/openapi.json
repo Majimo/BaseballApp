@@ -96,7 +96,7 @@
                   "teams": {
                     "type": "array",
                     "items": {
-                      "$ref": "#/components/schemas/Team"
+                      "$ref": "#/components/schemas/TeamInput"
                     },
                     "description": "Liste des équipes participant au tournoi. Le calendrier des matchs sera généré automatiquement."
                   }
@@ -174,7 +174,19 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Tournament"
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "example": "Nouveau nom de tournoi" },
+                  "location": {
+                    "type": "object",
+                    "properties": {
+                      "address": { "type": "string", "example": "Nouvelle adresse" },
+                      "city": { "type": "string", "example": "Nouvelle ville" },
+                      "zipCode": { "type": "string", "example": "54321" }
+                    }
+                  },
+                  "date": { "type": "string", "format": "date-time", "example": "2025-09-01T18:00:00Z" }
+                }
               }
             }
           }
@@ -624,6 +636,17 @@
         },
         "required": ["id", "firstName", "lastName", "jerseyNumber", "birthDate", "teamId"]
       },
+      "PlayerInput": {
+        "type": "object",
+        "properties": {
+          "firstName": { "type": "string", "example": "Jean" },
+          "lastName": { "type": "string", "example": "Dupont" },
+          "jerseyNumber": { "type": "string", "example": "23" },
+          "birthDate": { "type": "string", "format": "date", "example": "2000-01-01" },
+          "teamId": { "type": "string", "format": "uuid", "example": "uuid-equipe-existante" }
+        },
+        "required": ["firstName", "lastName", "jerseyNumber", "birthDate", "teamId"]
+      },
       "Team": {
         "type": "object",
         "properties": {
@@ -638,7 +661,15 @@
             "description": "Liste des joueurs de l'équipe"
           }
         },
-        "required": ["id", "name", "city", "players"]
+        "required": ["id", "name", "city"]
+      },
+      "TeamInput": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "example": "Les Dragons" },
+          "city": { "type": "string", "example": "Ville du Dragon" }
+        },
+        "required": ["name", "city"]
       },
       "Match": {
         "type": "object",
@@ -652,6 +683,17 @@
           "score": { "type": "string", "description": "Score du match (ex: '5-3')", "nullable": true }
         },
         "required": ["id", "tournamentId", "team1Id", "team2Id", "date", "time"]
+      },
+      "MatchInput": {
+        "type": "object",
+        "properties": {
+          "team1Id": { "type": "string", "format": "uuid", "example": "uuid-equipe-a" },
+          "team2Id": { "type": "string", "format": "uuid", "example": "uuid-equipe-b" },
+          "date": { "type": "string", "format": "date", "example": "2025-08-16" },
+          "time": { "type": "string", "example": "14:00" },
+          "score": { "type": "string", "example": "5-3", "nullable": true }
+        },
+        "required": ["team1Id", "team2Id", "date", "time"]
       },
       "Tournament": {
         "type": "object",

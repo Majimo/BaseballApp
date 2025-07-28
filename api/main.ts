@@ -1,6 +1,7 @@
 import { Application, Router, send } from "https://deno.land/x/oak@v17.1.5/mod.ts";
 import teamRoutes from "./routes/teamRoutes.ts";
 import tournamentRoutes from "./routes/tournamentRoutes.ts";
+import playerRoutes from "./routes/playerRoutes.ts";
 
 const app = new Application();
 const router = new Router();
@@ -75,6 +76,8 @@ app.use(teamRoutes.routes());
 app.use(teamRoutes.allowedMethods());
 app.use(tournamentRoutes.routes());
 app.use(tournamentRoutes.allowedMethods());
+app.use(playerRoutes.routes());
+app.use(playerRoutes.allowedMethods());
 
 
 console.log("Server running on http://localhost:8000");
