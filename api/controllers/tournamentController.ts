@@ -2,21 +2,21 @@ import { RouterContext } from "https://deno.land/x/oak@v17.1.5/mod.ts";
 import { Tournament, Match, Team } from "../models/tournament.ts"; // Assuming Tournament, Match, Team are defined here or in separate files
 import tournamentService from "../services/tournamentService.ts";
 import { db } from "../db/database.ts";
+import * as schema from "../db/schema.ts";
+import { eq, inArray } from "drizzle-orm";
 
 export const getTournaments = async (ctx: RouterContext) => {
   try {
-    const tournaments = await db.selectFrom('tournaments').selectAll().execute();
-    // For a complete Tournament object, you would need to join with teams and matches tables
-    // and reconstruct the object. For simplicity, returning raw tournament data for now.
+    const tournaments = await db.query.tournaments.findMany();
     ctx.response.body = tournaments.map(t => ({
       id: t.id,
       name: t.name,
       location: {
-        address: t.location_address,
-        city: t.location_city,
-        zipCode: t.location_zip_code,
+        address: t.locationAddress,
+        city: t.locationCity,
+        zipCode: t.locationZipCode,
       },
-      date: new Date(t.date), // Convert string back to Date
+      date: new Date(t.date),
       teams: [], // Teams would need to be fetched via a join
       matches: [], // Matches would need to be fetched via a join
     }));
@@ -29,20 +29,30 @@ export const getTournaments = async (ctx: RouterContext) => {
 export const getTournamentById = async (ctx: RouterContext) => {
   const { id } = ctx.params;
   try {
-    const tournament = await db.selectFrom('tournaments').where('id', '=', id).selectAll().executeTakeFirst();
+    const tournament = await db.query.tournaments.findFirst({ where: eq(schema.tournaments.id, id) });
     if (tournament) {
-      // Similarly, fetch associated teams and matches here if needed for the full object
+      const teams = await db.select().from(schema.teams).innerJoin(schema.tournamentTeams, eq(schema.teams.id, schema.tournamentTeams.teamId)).where(eq(schema.tournamentTeams.tournamentId, id));
+      const matches = await db.query.matches.findMany({ where: eq(schema.matches.tournamentId, id) });
+
       ctx.response.body = {
         id: tournament.id,
         name: tournament.name,
         location: {
-          address: tournament.location_address,
-          city: tournament.location_city,
-          zipCode: tournament.location_zip_code,
+          address: tournament.locationAddress,
+          city: tournament.locationCity,
+          zipCode: tournament.locationZipCode,
         },
         date: new Date(tournament.date),
-        teams: [],
-        matches: [],
+        teams: teams.map(t => ({ id: t.teams.id, name: t.teams.name, city: t.teams.city, players: []})),
+        matches: matches.map(m => ({
+          id: m.id,
+          tournamentId: m.tournamentId,
+          team1Id: m.team1Id,
+          team2Id: m.team2Id,
+          date: new Date(m.date),
+          time: m.time,
+          score: m.score || '',
+        })),
       };
     } else {
       ctx.response.status = 404;
@@ -55,58 +65,71 @@ export const getTournamentById = async (ctx: RouterContext) => {
 };
 
 export const createTournament = async (ctx: RouterContext) => {
+  const body = await ctx.request.body().value;
+  const newTournamentId = crypto.randomUUID();
+
   try {
-    const body = await ctx.request.body().value;
-    const newTournamentId = crypto.randomUUID();
+    await db.transaction(async (tx) => {
+      // 1. Create teams and get their IDs
+      const teamsToInsert = body.teams.map(t => ({ id: crypto.randomUUID(), name: t.name, city: t.city }));
+      if (teamsToInsert.length > 0) {
+        await tx.insert(schema.teams).values(teamsToInsert);
+      }
 
-    // Insert tournament data
-    const tournamentData = {
-      id: newTournamentId,
-      name: body.name,
-      location_address: body.location.address,
-      location_city: body.location.city,
-      location_zip_code: body.location.zipCode,
-      date: new Date(body.date).toISOString(), // Store as ISO string
-    };
-    await db.insertInto('tournaments').values(tournamentData).execute();
+      // 2. Create the tournament
+      const tournamentData = {
+        id: newTournamentId,
+        name: body.name,
+        locationAddress: body.location.address,
+        locationCity: body.location.city,
+        locationZipCode: body.location.zipCode,
+        date: new Date(body.date).toISOString(),
+      };
+      await tx.insert(schema.tournaments).values(tournamentData);
 
-    // Generate and insert matches
-    const generatedMatches = tournamentService.generateMatches(body.teams as Team[]);
-    const matchesToInsert = generatedMatches.map(m => ({
-      id: crypto.randomUUID(),
-      tournament_id: newTournamentId,
-      team1_id: m.team1Id,
-      team2_id: m.team2Id,
-      date: m.date.toISOString().split('T')[0], // Store as YYYY-MM-DD
-      time: m.time,
-      score: null, // Initial score is null
-    }));
+      // 3. Link teams to the tournament
+      const tournamentTeamsToInsert = teamsToInsert.map(t => ({ tournamentId: newTournamentId, teamId: t.id }));
+      if (tournamentTeamsToInsert.length > 0) {
+        await tx.insert(schema.tournamentTeams).values(tournamentTeamsToInsert);
+      }
 
-    if (matchesToInsert.length > 0) {
-      await db.insertInto('matches').values(matchesToInsert).execute();
-    }
+      // 4. Generate and insert matches
+      const generatedMatches = tournamentService.generateMatches(teamsToInsert as Team[]);
+      const matchesToInsert = generatedMatches.map(m => ({
+        id: crypto.randomUUID(),
+        tournamentId: newTournamentId,
+        team1Id: m.team1Id,
+        team2Id: m.team2Id,
+        date: m.date.toISOString().split('T')[0],
+        time: m.time,
+        score: null,
+      }));
+      if (matchesToInsert.length > 0) {
+        await tx.insert(schema.matches).values(matchesToInsert);
+      }
+    });
 
-    // Fetch the newly created tournament with its generated matches for the response
-    const createdTournament = await db.selectFrom('tournaments').where('id', '=', newTournamentId).selectAll().executeTakeFirst();
-    const associatedMatches = await db.selectFrom('matches').where('tournament_id', '=', newTournamentId).selectAll().execute();
+    const createdTournament = await db.query.tournaments.findFirst({ where: eq(schema.tournaments.id, newTournamentId) });
+    const associatedTeams = await db.select().from(schema.teams).innerJoin(schema.tournamentTeams, eq(schema.teams.id, schema.tournamentTeams.teamId)).where(eq(schema.tournamentTeams.tournamentId, newTournamentId));
+    const associatedMatches = await db.query.matches.findMany({ where: eq(schema.matches.tournamentId, newTournamentId) });
 
     ctx.response.status = 201;
     ctx.response.body = {
       id: createdTournament?.id,
       name: createdTournament?.name,
       location: {
-        address: createdTournament?.location_address,
-        city: createdTournament?.location_city,
-        zipCode: createdTournament?.location_zip_code,
+        address: createdTournament?.locationAddress,
+        city: createdTournament?.locationCity,
+        zipCode: createdTournament?.locationZipCode,
       },
       date: new Date(createdTournament?.date || ''),
-      teams: body.teams, // Teams are passed in the request, not fetched from DB here
+      teams: associatedTeams.map(t => ({ id: t.teams.id, name: t.teams.name, city: t.teams.city, players: []})),
       matches: associatedMatches.map(m => ({
         id: m.id,
-        tournamentId: m.tournament_id,
-        team1Id: m.team1_id,
-        team2Id: m.team2_id,
-        date: new Date(m.date), // Convert string back to Date
+        tournamentId: m.tournamentId,
+        team1Id: m.team1Id,
+        team2Id: m.team2Id,
+        date: new Date(m.date),
         time: m.time,
         score: m.score || '',
       })),
@@ -122,27 +145,25 @@ export const updateTournament = async (ctx: RouterContext) => {
   const { id } = ctx.params;
   try {
     const body = await ctx.request.body().value;
-    const updatedData: Record<string, unknown> = {
+    const updatedData = {
       name: body.name,
       date: new Date(body.date).toISOString(),
+      locationAddress: body.location?.address,
+      locationCity: body.location?.city,
+      locationZipCode: body.location?.zipCode,
     };
-    if (body.location) {
-      updatedData.location_address = body.location.address;
-      updatedData.location_city = body.location.city;
-      updatedData.location_zip_code = body.location.zipCode;
-    }
 
-    const result = await db.updateTable('tournaments').set(updatedData).where('id', '=', id).executeTakeFirst();
+    const result = await db.update(schema.tournaments).set(updatedData).where(eq(schema.tournaments.id, id));
 
-    if (result?.numUpdatedRows && result.numUpdatedRows > 0) {
-      const updatedTournament = await db.selectFrom('tournaments').where('id', '=', id).selectAll().executeTakeFirst();
+    if (result.rowsAffected && result.rowsAffected > 0) {
+      const updatedTournament = await db.query.tournaments.findFirst({ where: eq(schema.tournaments.id, id) });
       ctx.response.body = {
         id: updatedTournament?.id,
         name: updatedTournament?.name,
         location: {
-          address: updatedTournament?.location_address,
-          city: updatedTournament?.location_city,
-          zipCode: updatedTournament?.location_zip_code,
+          address: updatedTournament?.locationAddress,
+          city: updatedTournament?.locationCity,
+          zipCode: updatedTournament?.locationZipCode,
         },
         date: new Date(updatedTournament?.date || ''),
         teams: [], // Not updated here
@@ -161,12 +182,12 @@ export const updateTournament = async (ctx: RouterContext) => {
 export const getTournamentMatches = async (ctx: RouterContext) => {
     const { id } = ctx.params;
     try {
-        const matches = await db.selectFrom('matches').where('tournament_id', '=', id).selectAll().execute();
+        const matches = await db.query.matches.findMany({ where: eq(schema.matches.tournamentId, id) });
         ctx.response.body = matches.map(m => ({
             id: m.id,
-            tournamentId: m.tournament_id,
-            team1Id: m.team1_id,
-            team2Id: m.team2_id,
+            tournamentId: m.tournamentId,
+            team1Id: m.team1Id,
+            team2Id: m.team2Id,
             date: new Date(m.date),
             time: m.time,
             score: m.score || '',
@@ -184,21 +205,21 @@ export const addTournamentMatch = async (ctx: RouterContext) => {
         const newMatchId = crypto.randomUUID();
         const matchToInsert = {
             id: newMatchId,
-            tournament_id: id,
-            team1_id: body.team1Id,
-            team2_id: body.team2Id,
+            tournamentId: id,
+            team1Id: body.team1Id,
+            team2Id: body.team2Id,
             date: new Date(body.date).toISOString().split('T')[0],
             time: body.time,
             score: body.score || null,
         };
-        await db.insertInto('matches').values(matchToInsert).execute();
-        const createdMatch = await db.selectFrom('matches').where('id', '=', newMatchId).selectAll().executeTakeFirst();
+        await db.insert(schema.matches).values(matchToInsert);
+        const createdMatch = await db.query.matches.findFirst({ where: eq(schema.matches.id, newMatchId) });
         ctx.response.status = 201;
         ctx.response.body = {
             id: createdMatch?.id,
-            tournamentId: createdMatch?.tournament_id,
-            team1Id: createdMatch?.team1_id,
-            team2Id: createdMatch?.team2_id,
+            tournamentId: createdMatch?.tournamentId,
+            team1Id: createdMatch?.team1Id,
+            team2Id: createdMatch?.team2Id,
             date: new Date(createdMatch?.date || ''),
             time: createdMatch?.time,
             score: createdMatch?.score || '',
@@ -213,22 +234,22 @@ export const updateTournamentMatch = async (ctx: RouterContext) => {
     const { id, idMatch } = ctx.params;
     try {
         const body = await ctx.request.body().value;
-        const updatedData: Record<string, unknown> = {
-            team1_id: body.team1Id,
-            team2_id: body.team2Id,
+        const updatedData = {
+            team1Id: body.team1Id,
+            team2Id: body.team2Id,
             date: new Date(body.date).toISOString().split('T')[0],
             time: body.time,
             score: body.score || null,
         };
-        const result = await db.updateTable('matches').set(updatedData).where('id', '=', idMatch).where('tournament_id', '=', id).executeTakeFirst();
+        const result = await db.update(schema.matches).set(updatedData).where(eq(schema.matches.id, idMatch)).where(eq(schema.matches.tournamentId, id));
 
-        if (result?.numUpdatedRows && result.numUpdatedRows > 0) {
-            const updatedMatch = await db.selectFrom('matches').where('id', '=', idMatch).selectAll().executeTakeFirst();
+        if (result.rowsAffected && result.rowsAffected > 0) {
+            const updatedMatch = await db.query.matches.findFirst({ where: eq(schema.matches.id, idMatch) });
             ctx.response.body = {
                 id: updatedMatch?.id,
-                tournamentId: updatedMatch?.tournament_id,
-                team1Id: updatedMatch?.team1_id,
-                team2Id: updatedMatch?.team2_id,
+                tournamentId: updatedMatch?.tournamentId,
+                team1Id: updatedMatch?.team1Id,
+                team2Id: updatedMatch?.team2Id,
                 date: new Date(updatedMatch?.date || ''),
                 time: updatedMatch?.time,
                 score: updatedMatch?.score || '',

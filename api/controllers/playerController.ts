@@ -1,19 +1,21 @@
 import { RouterContext } from "https://deno.land/x/oak@v17.1.5/mod.ts";
 import { Player } from "../models/player.ts";
 import { db } from "../db/database.ts";
+import * as schema from "../db/schema.ts";
+import { eq } from "drizzle-orm";
 
 export const getPlayerById = async (ctx: RouterContext) => {
   const { id } = ctx.params;
   try {
-    const player = await db.selectFrom('players').where('id', '=', id).selectAll().executeTakeFirst();
+    const player = await db.query.players.findFirst({ where: eq(schema.players.id, id) });
     if (player) {
       ctx.response.body = {
         id: player.id,
-        firstName: player.first_name,
-        lastName: player.last_name,
-        jerseyNumber: player.jersey_number,
-        birthDate: new Date(player.birth_date),
-        teamId: player.team_id,
+        firstName: player.firstName,
+        lastName: player.lastName,
+        jerseyNumber: player.jerseyNumber,
+        birthDate: new Date(player.birthDate),
+        teamId: player.teamId,
       };
     } else {
       ctx.response.status = 404;
@@ -37,14 +39,14 @@ export const createPlayer = async (ctx: RouterContext) => {
       birthDate: new Date(body.birthDate),
       teamId: body.teamId,
     };
-    await db.insertInto('players').values({
+    await db.insert(schema.players).values({
       id: newPlayer.id,
-      first_name: newPlayer.firstName,
-      last_name: newPlayer.lastName,
-      jersey_number: newPlayer.jerseyNumber,
-      birth_date: newPlayer.birthDate.toISOString().split('T')[0],
-      team_id: newPlayer.teamId,
-    }).execute();
+      firstName: newPlayer.firstName,
+      lastName: newPlayer.lastName,
+      jerseyNumber: newPlayer.jerseyNumber,
+      birthDate: newPlayer.birthDate.toISOString().split('T')[0],
+      teamId: newPlayer.teamId,
+    });
     ctx.response.status = 201;
     ctx.response.body = newPlayer;
   } catch (error) {
@@ -57,24 +59,24 @@ export const updatePlayer = async (ctx: RouterContext) => {
   const { id } = ctx.params;
   try {
     const body = await ctx.request.body().value;
-    const updatedData: Record<string, unknown> = {
-      first_name: body.firstName,
-      last_name: body.lastName,
-      jersey_number: body.jerseyNumber,
-      birth_date: new Date(body.birthDate).toISOString().split('T')[0],
-      team_id: body.teamId,
+    const updatedData = {
+      firstName: body.firstName,
+      lastName: body.lastName,
+      jerseyNumber: body.jerseyNumber,
+      birthDate: new Date(body.birthDate).toISOString().split('T')[0],
+      teamId: body.teamId,
     };
-    const result = await db.updateTable('players').set(updatedData).where('id', '=', id).executeTakeFirst();
+    const result = await db.update(schema.players).set(updatedData).where(eq(schema.players.id, id));
 
-    if (result?.numUpdatedRows && result.numUpdatedRows > 0) {
-      const updatedPlayer = await db.selectFrom('players').where('id', '=', id).selectAll().executeTakeFirst();
+    if (result.rowsAffected && result.rowsAffected > 0) {
+      const updatedPlayer = await db.query.players.findFirst({ where: eq(schema.players.id, id) });
       ctx.response.body = {
         id: updatedPlayer?.id,
-        firstName: updatedPlayer?.first_name,
-        lastName: updatedPlayer?.last_name,
-        jerseyNumber: updatedPlayer?.jersey_number,
-        birthDate: new Date(updatedPlayer?.birth_date || ''),
-        teamId: updatedPlayer?.team_id,
+        firstName: updatedPlayer?.firstName,
+        lastName: updatedPlayer?.lastName,
+        jerseyNumber: updatedPlayer?.jerseyNumber,
+        birthDate: new Date(updatedPlayer?.birthDate || ''),
+        teamId: updatedPlayer?.teamId,
       };
     } else {
       ctx.response.status = 404;

@@ -1,10 +1,12 @@
 import { RouterContext } from "https://deno.land/x/oak@v17.1.5/mod.ts";
 import { Team } from "../models/team.ts";
 import { db } from "../db/database.ts";
+import * as schema from "../db/schema.ts";
+import { eq } from "drizzle-orm";
 
 export const getTeams = async (ctx: RouterContext) => {
   try {
-    const teams = await db.selectFrom('teams').selectAll().execute();
+    const teams = await db.query.teams.findMany();
     ctx.response.body = teams.map(t => ({
       id: t.id,
       name: t.name,
@@ -20,7 +22,7 @@ export const getTeams = async (ctx: RouterContext) => {
 export const getTeamById = async (ctx: RouterContext) => {
   const { id } = ctx.params;
   try {
-    const team = await db.selectFrom('teams').where('id', '=', id).selectAll().executeTakeFirst();
+    const team = await db.query.teams.findFirst({ where: eq(schema.teams.id, id) });
     if (team) {
       // Fetch associated players here if needed for the full object
       ctx.response.body = {
@@ -49,7 +51,7 @@ export const createTeam = async (ctx: RouterContext) => {
       city: body.city,
       players: [], // Players are added separately
     };
-    await db.insertInto('teams').values(newTeam).execute();
+    await db.insert(schema.teams).values(newTeam);
     ctx.response.status = 201;
     ctx.response.body = newTeam;
   } catch (error) {
@@ -62,14 +64,14 @@ export const updateTeam = async (ctx: RouterContext) => {
   const { id } = ctx.params;
   try {
     const body = await ctx.request.body().value;
-    const updatedData: Record<string, unknown> = {
+    const updatedData = {
       name: body.name,
       city: body.city,
     };
-    const result = await db.updateTable('teams').set(updatedData).where('id', '=', id).executeTakeFirst();
+    const result = await db.update(schema.teams).set(updatedData).where(eq(schema.teams.id, id));
 
-    if (result?.numUpdatedRows && result.numUpdatedRows > 0) {
-      const updatedTeam = await db.selectFrom('teams').where('id', '=', id).selectAll().executeTakeFirst();
+    if (result.rowsAffected && result.rowsAffected > 0) {
+      const updatedTeam = await db.query.teams.findFirst({ where: eq(schema.teams.id, id) });
       ctx.response.body = {
         id: updatedTeam?.id,
         name: updatedTeam?.name,

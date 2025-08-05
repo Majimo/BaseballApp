@@ -34,10 +34,16 @@ export interface MatchTable {
   score: string | null;
 }
 
+export interface TournamentTeamsTable {
+    tournament_id: string;
+    team_id: string;
+}
+
 // Database interface for Kysely
 export interface DB {
   players: PlayerTable;
   teams: TeamTable;
   tournaments: TournamentTable;
   matches: MatchTable;
+  tournament_teams: TournamentTeamsTable;
 }

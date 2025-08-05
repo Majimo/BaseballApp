@@ -1,55 +1,47 @@
-import { Kysely, SqliteDialect, sql } from 'kysely';
-import { DB } from './types.ts';
-import { Database as SQLiteDB } from "sqlite";
+import { Database as DB } from "sqlite";
+import * as path from "https://deno.land/std@0.224.0/path/mod.ts";
 
-const dialect = new SqliteDialect({
-  database: new SQLiteDB("baseball.db"),
-});
+async function runMigrations() {
+  console.log('Running migrations...');
 
-const db = new Kysely<DB>({
-  dialect,
-});
+  const db = new DB('baseball.db');
+  const migrationsFolder = './api/db/migrations';
 
-async function migrate() {
-  const migrationsDir = "./api/db/migrations";
-  const migrationFiles = [];
+  try {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS __migrations (
+        name TEXT PRIMARY KEY,
+        executed_at TEXT NOT NULL
+      );
+    `);
 
-  for await (const dirEntry of Deno.readDir(migrationsDir)) {
-    if (dirEntry.isFile && dirEntry.name.endsWith(".sql")) {
-      migrationFiles.push(dirEntry.name);
+    const executed = db.prepare("SELECT name FROM __migrations").all();
+    const executedNames = new Set(executed.map(row => row[0]));
+
+    for await (const dirEntry of Deno.readDir(migrationsFolder)) {
+      if (dirEntry.isFile && dirEntry.name.endsWith('.sql')) {
+        const migrationName = dirEntry.name;
+        if (!executedNames.has(migrationName)) {
+          console.log(`Executing migration: ${migrationName}`);
+          const sqlContent = await Deno.readTextFile(path.join(migrationsFolder, migrationName));
+          db.exec(sqlContent);
+          db.prepare("INSERT INTO __migrations (name, executed_at) VALUES (?, ?)").run(
+            migrationName,
+            new Date().toISOString(),
+          );
+        } else {
+          console.log(`Migration already executed: ${migrationName}`);
+        }
+      }
     }
+
+    console.log('Migrations finished successfully.');
+  } catch (error) {
+    console.error('Failed to run migrations:', error);
+    Deno.exit(1);
+  } finally {
+    db.close();
   }
-  migrationFiles.sort();
-
-  await db.schema
-    .createTable("kysely_migration")
-    .ifNotExists()
-    .addColumn("name", "text", (col) => col.notNull().primaryKey())
-    .addColumn("timestamp", "text", (col) => col.notNull())
-    .execute();
-
-  for (const file of migrationFiles) {
-    const migrationName = file.replace(".sql", "");
-    const hasRun = await db
-      .selectFrom("kysely_migration")
-      .where("name", "=", migrationName)
-      .selectAll()
-      .executeTakeFirst();
-
-    if (!hasRun) {
-      console.log(`Running migration: ${file}`);
-      const sqlContent = await Deno.readTextFile(`${migrationsDir}/${file}`);
-      await sql.raw(sqlContent).execute(db);
-      await db
-        .insertInto("kysely_migration")
-        .values({ name: migrationName, timestamp: new Date().toISOString() })
-        .execute();
-    } else {
-      console.log(`Migration already run: ${file}`);
-    }
-  }
-
-  await db.destroy();
 }
 
-migrate();
+runMigrations();

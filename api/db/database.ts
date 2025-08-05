@@ -1,11 +1,6 @@
-import { Kysely, SqliteDialect } from 'kysely';
-import { DB } from './types.ts';
-import { Database as SQLiteDB } from "sqlite";
+import { drizzle } from 'drizzle-orm/sqlite-proxy';
+import { Database as DB } from 'sqlite';
+import * as schema from './schema.ts';
 
-const dialect = new SqliteDialect({
-  database: new SQLiteDB("baseball.db"),
-});
-
-export const db = new Kysely<DB>({
-  dialect,
-});
+const sqlite = new DB('baseball.db');
+export const db = drizzle(sqlite, { schema });

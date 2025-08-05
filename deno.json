@@ -1,13 +1,17 @@
 {
   "imports": {
-    "kysely": "npm:kysely",
-    "sqlite": "jsr:@db/sqlite",
-    "kysely-deno-sqlite": "https://deno.land/x/kysely_deno_sqlite@2.0.0/mod.ts"
+    "drizzle-orm": "npm:drizzle-orm",
+    "drizzle-orm/sqlite-proxy": "npm:drizzle-orm/sqlite-proxy",
+    "drizzle-orm/sqlite-core": "npm:drizzle-orm/sqlite-core",
+    "drizzle-kit": "npm:drizzle-kit",
+    "sqlite": "jsr:@db/sqlite@^0.11.0"
   },
   "tasks": {
     "start": "deno run --allow-net --allow-read --allow-write --allow-env --allow-ffi --unstable-ffi api/main.ts",
-    "migrate": "deno run --allow-read --allow-write --allow-env --allow-ffi --unstable-ffi api/db/migrate.ts"
+    "drizzle:generate": "deno run --allow-read --allow-write --allow-env --allow-sys --allow-run npm:drizzle-kit generate",
+    "migrate": "deno run --allow-read --allow-write --allow-env --allow-ffi --unstable-ffi --allow-net api/db/migrate.ts"
   },
+  "nodeModulesDir": "auto",
   "fmt": {
     "options": {
       "useTabs": true,
