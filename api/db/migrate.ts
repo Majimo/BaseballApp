@@ -4,7 +4,7 @@ import * as path from "https://deno.land/std@0.224.0/path/mod.ts";
 async function runMigrations() {
   console.log('Running migrations...');
 
-  const db = new DB('baseball.db');
+  const db = new DB('./data/baseball.db');
   const migrationsFolder = './api/db/migrations';
 
   try {

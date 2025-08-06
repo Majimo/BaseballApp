@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  api:
+    # Construire l'image à partir du Dockerfile dans le répertoire courant
+    build: .
+    # Nommer l'image pour la retrouver facilement
+    image: baseball-app-api
+    # Redémarrer automatiquement le conteneur s'il plante
+    restart: unless-stopped
+    # Mapper le port 8000 du conteneur au port 8000 de la machine
+    ports:
+      - "8000:8000"
+    # Définir les variables d'environnement si nécessaire (aucune pour l'instant)
+    environment:
+      - DENO_ENV=production
+    # Monter un volume pour la persistance de la base de données
+    # Le fichier baseball.db sera stocké dans un volume nommé `db_data` sur la machine
+    volumes:
+      - db_data:/app/data
+
+# Définir le volume nommé pour la persistance des données
+volumes:
+  db_data:
